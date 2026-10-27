@@ -1,0 +1,438 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id
+  email         String    @unique
+  name          String?
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  Profile           Profile?
+  UserProfile       UserProfile?       @relation("UserProfileRelation")
+  contents          ContentIdea[]      @relation("UserContents")
+  todos             Todo[]             @relation("UserTodos")
+  events            CalendarEvent[]    @relation("UserEvents")
+  periodEntries     PeriodEntry[]      @relation("UserPeriodEntries")
+  periodSettings    PeriodSettings?    @relation("UserPeriodSettings")
+  moodEntries       MoodEntry[]        @relation("UserMoodEntries")
+  habits            Habit[]            @relation("UserHabits")
+  goals             Goal[]             @relation("UserGoals")
+  feedingEntries    FeedingEntry[]     @relation("UserFeedingEntries")
+  pregnancySymptoms PregnancySymptom[] @relation("UserPregnancySymptoms")
+  kickCounts        KickCount[]        @relation("UserKickCounts")
+  creatorProfile    CreatorProfile?    @relation("UserCreatorProfile")
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@map("verification")
+}
+
+model Profile {
+  id     Int    @id @default(autoincrement())
+  handle String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+}
+
+// ============================================
+// User Profile Data (synced to cloud)
+// ============================================
+model UserProfile {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation("UserProfileRelation", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Basic info
+  firstName         String?
+  lastName          String?
+  displayName       String?
+  email             String?
+  profilePicture    String?
+
+  // Social accounts (JSON)
+  socialAccounts    String?  // JSON string
+
+  // Creator settings (JSON)
+  creatorNiches     String?  // JSON array
+  customNiche       String?
+  creatorGoals      String?  // JSON array
+  postingStyle      String?
+
+  // Dashboard settings (JSON)
+  dashboardSections String?  // JSON array
+
+  // Visionboard images (JSON)
+  visionboardImages String?  // JSON array
+
+  // Health data (JSON)
+  healthData        String?  // JSON object
+
+  // Analysis results (JSON)
+  analysisResults   String?  // JSON object
+
+  // Flags
+  hasCompletedOnboarding Boolean @default(false)
+  hasCompletedAnalysis   Boolean @default(false)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("user_profile")
+}
+
+// ============================================
+// Content Ideas
+// ============================================
+model ContentIdea {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation("UserContents", fields: [userId], references: [id], onDelete: Cascade)
+
+  text          String
+  category      String   // Reels, Stories, Shorts, etc.
+  scheduledDate String
+  status        String   // planned, in_progress, published
+
+  // Optional fields
+  hook          String?
+  description   String?
+  cta           String?
+  inspirations  String?  // JSON array of InspirationLink
+
+  // ELLY Generation Tracking (NEW)
+  isELLYGenerated   Boolean   @default(false)   // Mark if AI-generated
+  generatedBy       String?   // "elly-chat", "elly-ideas", etc.
+  suggestedDate     String?   // Date ELLY recommended for posting
+  generationPrompt  String?   // JSON of input that generated this
+  generationModel   String?   // "claude-opus-4-6" or similar
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("content_idea")
+}
+
+// ============================================
+// Todos
+// ============================================
+model Todo {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation("UserTodos", fields: [userId], references: [id], onDelete: Cascade)
+
+  text      String
+  dueDate   String?
+  priority  String   // high, normal, low
+  completed Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("todo")
+}
+
+// ============================================
+// Calendar Events
+// ============================================
+model CalendarEvent {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation("UserEvents", fields: [userId], references: [id], onDelete: Cascade)
+
+  title        String
+  date         String
+  time         String
+  endTime      String?
+  notes        String?
+  isAllDay     Boolean  @default(false)
+  isFromDevice Boolean  @default(false)
+  calendarColor String?
+  syncCategory String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("calendar_event")
+}
+
+// ============================================
+// Period/Wellness Tracking
+// ============================================
+model PeriodEntry {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation("UserPeriodEntries", fields: [userId], references: [id], onDelete: Cascade)
+
+  startDate String
+  endDate   String?
+  flow      String   // light, medium, heavy
+  symptoms  String   // JSON array
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("period_entry")
+}
+
+model PeriodSettings {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  user                 User     @relation("UserPeriodSettings", fields: [userId], references: [id], onDelete: Cascade)
+
+  cycleLength          Int      @default(28)
+  periodLength         Int      @default(5)
+  lastPeriodStart      String?
+  trackingEnabled      Boolean  @default(true)
+  status               String   @default("regular") // regular, pregnant, breastfeeding
+  hasChosenTrackerType Boolean  @default(false)
+
+  // Pregnancy tracking
+  dueDate              String?
+  pregnancyStartDate   String?
+
+  // Breastfeeding tracking
+  babyBirthDate        String?
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("period_settings")
+}
+
+model MoodEntry {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation("UserMoodEntries", fields: [userId], references: [id], onDelete: Cascade)
+
+  mood      String   // amazing, good, okay, meh, bad
+  note      String?
+  date      String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("mood_entry")
+}
+
+model Habit {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation("UserHabits", fields: [userId], references: [id], onDelete: Cascade)
+
+  name           String
+  icon           String
+  color          String
+  frequency      String   // daily, weekly
+  completedDates String   // JSON array of date strings
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("habit")
+}
+
+model Goal {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation("UserGoals", fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  targetDate  String?
+  progress    Int      @default(0)
+  completed   Boolean  @default(false)
+  color       String
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("goal")
+}
+
+model FeedingEntry {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation("UserFeedingEntries", fields: [userId], references: [id], onDelete: Cascade)
+
+  date      String
+  time      String
+  side      String   // left, right, both
+  duration  Int      // minutes
+  type      String   // nursing, pumping, bottle
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("feeding_entry")
+}
+
+model PregnancySymptom {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation("UserPregnancySymptoms", fields: [userId], references: [id], onDelete: Cascade)
+
+  date      String
+  symptoms  String   // JSON array
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("pregnancy_symptom")
+}
+
+model KickCount {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation("UserKickCounts", fields: [userId], references: [id], onDelete: Cascade)
+
+  date      String
+  startTime String
+  endTime   String?
+  count     Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("kick_count")
+}
+
+// ============================================
+// Creator Profile (NEW - for questionnaire data)
+// ============================================
+model CreatorProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation("UserCreatorProfile", fields: [userId], references: [id], onDelete: Cascade)
+
+  // ====== STEP 1: CREATOR DNA (MARKEN-DNA) ======
+  accountStandsFor          String?  // Wofür soll dein Account stehen
+  values                    String?  // JSON array - Welche Werte sollten sichtbar sein
+  customValues              String?  // JSON array - Custom values
+  audienceTransformation    String?  // Wie sollen sich Menschen fühlen
+  noGoPhrases               String?  // JSON array - Wörter die du NIE benutzt
+  customNoGoPhrases         String?  // JSON array
+  typicalPhrases            String?  // JSON array - Begriffe typisch für DICH
+
+  // ====== STEP 2: ZIELGRUPPE (AUDIENCE) ======
+  audienceDescription       String?  // Beschreibe deine Wunsch-Followerin
+  primaryPlatform           String?  // Wo ist Community aktivste (instagram, tiktok, etc)
+  motivations               String?  // JSON array - Was bewegt deine Zielgruppe
+  customMotivations         String?  // JSON array
+
+  // ====== STEP 3: STIMME & TONALITÄT (VOICE) ======
+  voiceStyle                String?  // Wie klingt dein Content (authentic-raw, inspiring, etc)
+  neverUsePhrases           String?  // JSON array - Phrasen die du NICHT nutzt
+  alwaysUsePhrases          String?  // JSON array - Begriffe die du IMMER nutzt
+
+  // ====== STEP 4: CONTENT & FORMATE ======
+  contentFormats            String?  // JSON array - Reels, Carousel, Stories, etc
+  contentTopics             String?  // JSON array - Business, Lifestyle, Fashion, etc
+  customTopics              String?  // JSON array
+  postingFrequency          String?  // daily, 3-5x-weekly, 1-2x-weekly, irregular
+
+  // ====== STEP 5: WORKFLOW & ZIELE ======
+  contentGoals              String?  // JSON array - Ziele (reach, community, products, etc)
+  currentLaunch             String?  // Aktueller Launch/Produkt (text)
+  weeklyTimeInvestment      String?  // under-3h, 3-7h, 7-15h, 15h-plus
+
+  // Completion tracking
+  isComplete                Boolean  @default(false)
+  completedAt               DateTime?
+  currentStep               Int      @default(0)
+
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@map("creator_profile")
+}
+
+// ============================================
+// AI Chat & Conversations
+// ============================================
+model AIConversation {
+  id        String       @id @default(uuid())
+  userId    String       // Supabase user ID (no FK constraint)
+
+  title     String?      // Optional title for the conversation
+  messages  AIMessage[]  // Messages in this conversation
+
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@map("ai_conversation")
+}
+
+model AIMessage {
+  id              String          @id @default(uuid())
+  conversationId  String
+  conversation    AIConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role            String          // "user" or "assistant"
+  content         String          // The message text
+
+  createdAt       DateTime        @default(now())
+
+  @@map("ai_message")
+}
+
