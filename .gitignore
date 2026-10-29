@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.local
+backend/prisma/dev.db
+backend/prisma/prisma/
+backend/prisma/*.db
+backend/dist/
+backend/generated/
+backend/uploads/
+mobile/.expo/
+mobile/node_modules/
+shared/node_modules/
+*.log
